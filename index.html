@@ -17,7 +17,7 @@
 <div class="field"><label for="municipio">Município</label><select id="municipio"><option value="">Todos os municípios</option></select></div>
 <div class="field"><label for="busca">Busca rápida</label><input id="busca" type="search" placeholder="Digite parte do cargo ou município"></div>
 <div class="field"><label for="concorrencia">Concorrência até (candidatos/vaga)</label><input id="concorrencia" type="number" min="0" step="any" inputmode="decimal" placeholder="Ex.: 10"></div>
-<div class="actions"><button class="button secondary" id="limpar" type="button">Limpar filtros</button><button class="button" id="exportar" type="button">Baixar CSV</button></div>
+<div class="actions"><button class="button secondary" id="limpar" type="button">Limpar filtros</button><button class="button" id="exportar" type="button">Baixar CSV</button><button class="button" id="relatorio" type="button">Gerar relatório PDF</button></div>
 </div></section>
 <section class="stats" aria-label="Resumo dos resultados">
 <div class="stat"><span class="label">Registros</span><strong id="s-registros">—</strong><small>cargos e municípios</small></div>
@@ -39,5 +39,64 @@ function render(){const rs=filtrar();corpo.innerHTML=rs.map(x=>`<tr><td>${esc(x.
 function esc(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 [cargo,municipio].forEach(x=>x.addEventListener('change',render));busca.addEventListener('input',render);concorrencia.addEventListener('input',render);$('limpar').addEventListener('click',()=>{cargo.value='';municipio.value='';busca.value='';concorrencia.value='';render()});
 $('exportar').addEventListener('click',()=>{const rs=filtrar(), cols=['Cargo','Município','Vagas','Inscritos','Candidatos por vaga'];const q=x=>'"'+String(x).replaceAll('"','""')+'"';const lines=[cols.map(q).join(';'),...rs.map(x=>[x.cargo,x.municipio,x.vagas,x.inscritos,fmt2.format(x.candidatosPorVaga)].map(q).join(';'))];const blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='demanda-candidatos-filtrada.csv';a.click();URL.revokeObjectURL(url)});
+$('relatorio').addEventListener('click',()=>{
+ const rs=filtrar();
+ const selected=[
+  ['Cargo',cargo.value||'Todos os cargos'],
+  ['Município',municipio.value||'Todos os municípios'],
+  ['Busca rápida',busca.value.trim()||'Sem busca textual'],
+  ['Concorrência máxima',concorrencia.value.trim()===''?'Sem limite':concorrencia.value.trim().replace('.',',')+' candidatos/vaga']
+ ];
+ const totalVagas=rs.reduce((s,x)=>s+x.vagas,0), totalInscritos=rs.reduce((s,x)=>s+x.inscritos,0);
+ const media=rs.length?fmt2.format(rs.reduce((s,x)=>s+x.candidatosPorVaga,0)/rs.length):'—';
+ const dataHora=new Intl.DateTimeFormat('pt-BR',{dateStyle:'long',timeStyle:'short'}).format(new Date());
+ const linhas=rs.map((x,i)=>'<tr><td class="idx">'+(i+1)+'</td><td><strong>'+esc(x.cargo)+'</strong></td><td>'+esc(x.municipio)+'</td><td class="num">'+fmtN.format(x.vagas)+'</td><td class="num">'+fmtN.format(x.inscritos)+'</td><td class="num ratio">'+fmt2.format(x.candidatosPorVaga)+'</td></tr>').join('');
+ const filtroHtml=selected.map(([k,v])=>'<div class="filter"><span>'+esc(k)+'</span><strong>'+esc(v)+'</strong></div>').join('');
+ const w=window.open('','_blank');
+ if(!w){alert('Permita pop-ups para gerar o relatório em PDF.');return;}
+ w.document.open();
+ w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Relatório — Demanda de candidatos</title><style>
+ :root{--ink:#17313a;--muted:#62747c;--teal:#087e78;--line:#dce7e6;--pale:#edf7f5}
+ *{box-sizing:border-box}body{margin:0;color:var(--ink);font:11px/1.45 "Segoe UI",Arial,sans-serif;background:#fff}
+ .page{max-width:1100px;margin:0 auto;padding:28px 30px}
+ .top{background:#123b43;color:white;padding:27px 30px;border-radius:14px;position:relative;overflow:hidden}
+ .eyebrow{color:#8ee0d3;text-transform:uppercase;letter-spacing:2px;font-size:9px;font-weight:700}
+ h1{font-size:25px;line-height:1.15;margin:8px 0}.subtitle{font-size:11px;color:#d0e1e1;margin:0}
+ .meta{margin-top:18px;padding-top:12px;border-top:1px solid #ffffff30;color:#d0e1e1;font-size:9px;display:flex;justify-content:space-between;gap:12px}
+ .section-title{font-size:12px;margin:22px 0 9px;font-weight:800}
+ .filters{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+ .filter{border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-width:0}
+ .filter span{display:block;color:var(--muted);font-size:9px;margin-bottom:3px}.filter strong{display:block;font-size:10px;overflow-wrap:anywhere}
+ .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:13px}
+ .stat{background:var(--pale);border:1px solid #dceeea;border-radius:9px;padding:12px}
+ .stat span{display:block;color:var(--muted);font-size:9px}.stat strong{display:block;font-size:19px;margin-top:3px;letter-spacing:-.4px}
+ table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:7px}
+ th{background:#123b43;color:white;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.4px;padding:9px 8px}
+ td{padding:7px 8px;border-bottom:1px solid #e8eeee;vertical-align:top;overflow-wrap:anywhere}
+ tbody tr:nth-child(even){background:#f5f9f8}td:first-child,th:first-child{width:32px;text-align:center;color:var(--muted)}
+ th:nth-child(2){width:30%}th:nth-child(3){width:22%}th:nth-child(4),th:nth-child(5),th:nth-child(6){width:12%}
+ .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.ratio{color:var(--teal);font-weight:800}
+ .empty{padding:25px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:8px;margin-top:10px}
+ .note{font-size:9px;color:var(--muted);margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+ .footer{font-size:8px;color:var(--muted);margin-top:14px;display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:8px}
+ @page{size:A4 landscape;margin:12mm}
+ @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{max-width:none;padding:0}.top{border-radius:8px}thead{display:table-header-group}tr{break-inside:avoid}.section-title{break-after:avoid}.filters,.stats{break-inside:avoid}.footer{position:fixed;bottom:0;left:0;right:0;background:white}}
+ @media screen{body{background:#eef3f3}.page{background:#fff;box-shadow:0 8px 36px #123b4318;min-height:100vh}}
+ </style></head><body><main class="page">
+ <header class="top"><div class="eyebrow">Painel de consulta · Concurso da Saúde do Tocantins</div><h1>Relatório de demanda por vaga</h1><p class="subtitle">Resultado detalhado conforme os filtros aplicados na consulta.</p><div class="meta"><span>Emitido em ${esc(dataHora)}</span><span>${fmtN.format(rs.length)} registros encontrados</span></div></header>
+ <h2 class="section-title">Filtros aplicados</h2><section class="filters">${filtroHtml}</section>
+ <h2 class="section-title">Resumo executivo</h2><section class="stats">
+ <div class="stat"><span>Registros encontrados</span><strong>${fmtN.format(rs.length)}</strong></div>
+ <div class="stat"><span>Total de vagas</span><strong>${fmtN.format(totalVagas)}</strong></div>
+ <div class="stat"><span>Total de inscritos</span><strong>${fmtN.format(totalInscritos)}</strong></div>
+ <div class="stat"><span>Média de candidatos/vaga</span><strong>${media}</strong></div>
+ </section>
+ <h2 class="section-title">Detalhamento dos resultados</h2>
+ ${rs.length?`<table><thead><tr><th>#</th><th>Cargo</th><th>Município</th><th class="num">Vagas</th><th class="num">Inscritos</th><th class="num">Candidatos/vaga</th></tr></thead><tbody>${linhas}</tbody></table>`:'<div class="empty">Nenhum registro corresponde aos filtros selecionados.</div>'}
+ <p class="note">A média considera a média simples dos valores de candidatos por vaga em cada registro. Os totais refletem exclusivamente os resultados filtrados. Documento gerado a partir do painel de consulta de demanda de candidatos por vaga.</p>
+ <div class="footer"><span>Demanda de candidatos por vaga · Saúde do Tocantins</span><span>Relatório para consulta</span></div>
+ </main><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),350));<\/script></body></html>`);
+ w.document.close();
+});
 render();
 </script></body></html>
