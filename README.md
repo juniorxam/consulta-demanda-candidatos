@@ -4,7 +4,7 @@ Página estática para consultar os dados do documento da demanda de candidatos 
 
 ## Como usar
 
-Abra [index.html](./index.html) no navegador. Filtre por cargo e município, use a busca rápida e baixe os resultados exibidos em CSV.
+Abra [index.html](./index.html) no navegador. Filtre por cargo e município, use a busca rápida, gere um relatório pronto para impressão ou PDF e baixe os resultados exibidos em CSV. A interface se adapta a celulares e tablets.
 
 ## Dados
 
